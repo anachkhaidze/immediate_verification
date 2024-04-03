@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>jsPsych Tutorial</title>
+    <script src="https://unpkg.com/jspsych@7.2.1"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-html-keyboard-response@1.1.0"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-image-keyboard-response@1.1.0"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-preload@1.0.0"></script>
+    <link href="https://unpkg.com/jspsych@7.2.1/css/jspsych.css" rel="stylesheet" type="text/css" />
+    <script src="trialInfo.js"></script>
+  </head>
+  <body></body>
+  <script>
+
+    /* Parameters */
+    // Conditions: W = word first, P = Picture first
+    var numBlocks = 1
+    var wordFormat = "W"  // Written (W) or Audio (A)
+    var condition = "P"  // Will be passed by Python to JS
+    var numPicExemplars = 4
+    var numAudioExemplars = 2
+    var blockMap = {"W": "word", "P": "picture"}
+    var whichTarget = {"picture": "word", "word": "picture"}
+
+    var block = blockMap[condition]
+    var wordFormatExp = blockMap[wordFormat]
+
+    var writtenExemplars = [
+        ["upperCase", "Times New Roman"],
+        ["lowerCase", "Times New Roman"],
+        ["upperCase", "Courier New"],
+        ["lowerCase", "Courier New"],
+      ]
+
+    /* Useful functions */
+    generateTrials = function(condition) {
+
+      let numTrialsPerBlock = trialInfo.length
+      let numTrials = numTrialsPerBlock * numBlocks * numPicExemplars
+      let isFlip = jsPsych.randomization.repeat([1,0], numTrials / 2, false) 
+
+      let writtenWordExamplar = jsPsych.randomization.repeat(
+        writtenExemplars, numTrialsPerBlock, false) 
+
+      let picExemplar = jsPsych.randomization.repeat(
+        [1,2,3,4], numTrialsPerBlock, false) 
+
+      let audioExemplar = jsPsych.randomization.repeat(
+        [1,2,3,4], numTrialsPerBlock, false) 
+
+
+      trialInfo = new Array(numPicExemplars).fill(trialInfo).flat();
+
+      for (let i = 0; i < trialInfo.length; i++) {
+
+        trialInfo.isFlip = isFlip[i];
+
+        // Flip target and cue
+        if (isFlip[i]) {
+          [trialInfo[i].cue, trialInfo[i].target] = [trialInfo[i].target, trialInfo[i].cue]
+        }
+
+        
+        if (wordFormat == "W") {
+          // writtenWordExemplar
+          trialInfo[i].writtenWordExemplarCase = writtenWordExamplar[i][0]
+          trialInfo[i].writtenWordExemplarFont= writtenWordExamplar[i][1]
+        } else {
+          // audioExemplar
+        trialInfo[i].audioExemplar = audioExemplar[i]
+        }
+
+        // picExemplar
+        trialInfo[i].picExemplar = picExemplar[i]
+
+
+        // block, target and wordFormat Type
+        trialInfo[i].block = block;
+        trialInfo[i].targetType = whichTarget[block];
+        trialInfo[i].wordFormatExp = wordFormatExp;
+
+        // correct Response
+        trialInfo[i].correct_response = trialInfo[i].cue == trialInfo[i].target ? "ArrowUp" : "ArrowDown"
+
+      }
+
+      trialInfo = jsPsych.randomization.shuffle(trialInfo);
+
+      return trialInfo
+
+    }
+
+    /* initialize jsPsych */
+    var jsPsych = initJsPsych({
+      on_finish: function() {
+        jsPsych.data.displayData();
+      }
+    });
+
+    /* create timeline */
+    var timeline = [];
+
+    /* trial info datafile */
+
+    /* preload stims */
+    /* automatic preload: the "auto_preload: true" setting tells the plugin to automatically
+    find stimuli to preload based the main experiment timeline (used in jsPsych.run)*/
+    var preload = {
+      type: jsPsychPreload,
+      auto_preload: true
+    }
+
+    // var preload = {
+    //   type: jsPsychPreload,
+    //   images: ['visual/bear_1.png', 'visual/bear_2.png']
+    // };
+    // timeline.push(preload);
+
+    /* generate a random subject ID with 8 characters */
+    var subject_id = jsPsych.randomization.randomID(8);
+
+    //* pick a random condition for the subject at the start of the experiment */
+    // var condition_assignment = jsPsych.randomization.sampleWithoutReplacement(['conditionA', 'conditionB', 'conditionC'], 1)[0];
+
+    // record the condition assignment in the jsPsych data
+    // this adds a property called 'subject' and a property called 'condition' to every trial
+    jsPsych.data.addProperties({
+      subject: subject_id
+    });
+
+    if (block == "word") {
+      var generalInstructions = "the printed word 'cat' and then see a picture of a cat"
+      var generalInstructionsSec = "the word 'cat' followed by a picture of a box"
+      var blockInstructions = "printed word and then see a picture"
+    } else {
+      var generalInstructions = "a picture of a cat and then see the printed word 'cat'"
+      var generalInstructionsSec = "a picture of a cat and then see the printed word 'box'"
+      var blockInstructions = "picture and then see a printed word"
+    }
+    
+    /* instructions trial */
+    var instructions = {
+      type: jsPsychHtmlKeyboardResponse,
+      stimulus: `
+        <p>Welcome to the experiment. Thank you for participating!</p><p>
+        In this experiment you will see various words and pictures. Your task
+        is simply to decide if they match or not, and to do this as quickly
+        and accurately as possible.</p><p>For example, you might see ${generalInstructions}.
+        In those cases, you should respond 'yes' (the two match). Other trials will present
+        a mismatch. For example, you might see ${generalInstructionsSec}. In those cases you should respond
+        with the 'no' key indicating that there is a mismatch.</p><p></p>It is
+        important that you respond as quickly as you can, but not so quick
+        that you make many mistakes. If you make a mistake, you will hear a
+        buzzing sound.<p>Throughout the experiment there will be some breaks
+        during which you can rest your eyes.</p><p>Please let the experimenter
+        know if you have any questions.</p><p><b>Press any key to continue.
+        </b></p>
+      `
+    };
+    timeline.push(instructions);
+
+    //Or see a picture of a cat and then see the printed word 'cat'. 
+
+    var blockInstructions = {
+      type: jsPsychHtmlKeyboardResponse,
+      stimulus: `
+        <p>For the upcoming trials, you will first see a ${blockInstructions}.</p><p>Please respond depending on whether the
+        picture matches the word. If the picture and the word <b>match</b>,
+        press '<b>upwards arrow</b>' on the keyboard. If the picture does
+        not match the word, press '<b>downwards arrow</b>.'</p></p><p><b>Press
+        any key to start the experiment.</b></p>
+      `,
+      post_trial_gap: 1000
+    };
+    timeline.push(blockInstructions);
+
+    var fixation = {
+      type: jsPsychHtmlKeyboardResponse,
+      stimulus: '<div style="font-size:60px;">+</div>',
+      choices: "NO_KEYS",
+      trial_duration: 500,
+      data: {
+        task: 'fixation'
+      }
+    };
+
+    var cue = {
+      type: jsPsychHtmlKeyboardResponse,
+      stimulus: function() {
+        let block = jsPsych.timelineVariable('block');
+        let cue = jsPsych.timelineVariable('cue');
+
+        if (block == "word") {
+          return cue;
+
+        } else {
+
+          let picExemplar = jsPsych.timelineVariable('picExemplar');
+          let path = `visual/${cue}_${picExemplar}.png`;
+          let stim = `<img src="${path}"/>`;
+          console.log(stim)
+          return stim;
+        }
+      },
+      choices: "NO_KEYS",
+      trial_duration: 500,
+      post_trial_gap: function(){
+        let delayVals = Array.from({ length: (1200 - 800) + 1}, (_, i) => 800 + i)
+        return jsPsych.randomization.sampleWithReplacement(delayVals, 1)[0];
+      } /* I need to randomly pick from 800-1200ms range */
+      // data: {
+      //   task: 'cue'
+      // }
+    };
+
+    var target = {
+      type: jsPsychHtmlKeyboardResponse,
+
+      stimulus: function() {
+        let targetType = jsPsych.timelineVariable('targetType');
+        let target = jsPsych.timelineVariable('target');
+
+        if (targetType == "word") {
+          return target;
+
+        } else {
+
+          let picExemplar = jsPsych.timelineVariable('picExemplar');
+          let path = `visual/${target}_${picExemplar}.png`;
+          let stim = `<img src="${path}"/>`;
+          console.log(stim)
+          return stim;
+        }
+      },
+
+      choices: ['ArrowDown', 'ArrowUp'],
+      data: {
+        task: 'response',
+        correct_response: jsPsych.timelineVariable('correct_response')
+      }
+      // on_finish: function(data){
+      //   data.correct = jsPsych.pluginAPI.compareKeys(data.response, data.correct_response);
+      // }
+    };
+
+    var test_procedure = {
+      timeline: [fixation, cue, target],
+      timeline_variables: generateTrials(),
+      //repetitions: 2
+    };
+    timeline.push(test_procedure);
+
+    /* start the experiment */
+    jsPsych.run(timeline);
+
+  </script>
+</html>
